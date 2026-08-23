@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/load_card.dart';
+import '../bloc/loads_bloc.dart';
+import '../data/models/load_models.dart';
 
 class LoadsScreen extends StatefulWidget {
   const LoadsScreen({super.key});
@@ -13,6 +16,15 @@ class LoadsScreen extends StatefulWidget {
 class _LoadsScreenState extends State<LoadsScreen> {
   int _selectedFilter = 0;
   final _filters = ['Barchasi', 'Bugun', 'Ertaga'];
+
+  @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<LoadsBloc>();
+    if (bloc.state is LoadsInitial) {
+      bloc.add(const LoadsFetchRequested());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +43,11 @@ class _LoadsScreenState extends State<LoadsScreen> {
       body: Column(
         children: [
           _buildFilters(),
-          Expanded(child: _buildLoadsList()),
+          Expanded(child: _buildBody()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () => context.push('/loads/create'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
@@ -86,40 +98,104 @@ class _LoadsScreenState extends State<LoadsScreen> {
     );
   }
 
-  Widget _buildLoadsList() {
-    final loads = [
-      ('Toshkent', 'Samarqand', '12 t', '4 500 000 UZS', 'Bugun, 14:00', 'Tentli yuk', '82 m³'),
-      ('Toshkent', "Farg'ona", '8 t', '3 200 000 UZS', 'Bugun, 16:30', 'Yopiq furgon', '45 m³'),
-      ('Toshkent', 'Buxoro', '20 t', '6 800 000 UZS', 'Ertaga, 09:00', 'Tentli yuk', '120 m³'),
-      ('Navoiy', 'Toshkent', '15 t', '5 100 000 UZS', 'Ertaga, 11:00', 'Yopiq furgon', '60 m³'),
-      ('Andijon', 'Toshkent', '10 t', '3 000 000 UZS', '23-may, 10:00', null, null),
-    ];
+  Widget _buildBody() {
+    return BlocBuilder<LoadsBloc, LoadsState>(
+      builder: (context, state) {
+        if (state is LoadsLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (state is LoadsError) {
+          return _buildErrorState(state.message);
+        }
+        if (state is LoadsLoaded) {
+          if (state.loads.isEmpty) return _buildEmptyState();
+          return _buildLoadsList(state.loads);
+        }
+        return _buildEmptyState();
+      },
+    );
+  }
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider, width: 0.5),
+  Widget _buildLoadsList(List<LoadResponse> loads) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<LoadsBloc>().add(const LoadsRefreshRequested());
+      },
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider, width: 0.5),
+        ),
+        child: ListView.separated(
+          padding: EdgeInsets.zero,
+          itemCount: loads.length,
+          separatorBuilder: (_, __) =>
+              const Divider(indent: 16, endIndent: 16),
+          itemBuilder: (context, index) {
+            final load = loads[index];
+            return LoadCard(
+              origin: load.pickupCity,
+              destination: load.deliveryCity,
+              weight: load.formattedWeight,
+              price: load.formattedPrice,
+              date: load.cargoType ?? '',
+              vehicleType: load.cargoDescription,
+              volume: load.formattedVolume.isNotEmpty
+                  ? load.formattedVolume
+                  : null,
+              showHeart: true,
+              onTap: () => context.push('/loads/${load.loadId}'),
+            );
+          },
+        ),
       ),
-      child: ListView.separated(
-        padding: EdgeInsets.zero,
-        itemCount: loads.length,
-        separatorBuilder: (_, _) => const Divider(indent: 16, endIndent: 16),
-        itemBuilder: (context, index) {
-          final l = loads[index];
-          return LoadCard(
-            origin: l.$1,
-            destination: l.$2,
-            weight: l.$3,
-            price: l.$4,
-            date: l.$5,
-            vehicleType: l.$6,
-            volume: l.$7,
-            showHeart: true,
-            onTap: () => context.push('/loads/${index + 1}'),
-          );
-        },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.inventory_2_outlined,
+              size: 64, color: AppColors.textMuted),
+          const SizedBox(height: 16),
+          const Text(
+            'Hozircha yuklar topilmadi',
+            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () =>
+                context.read<LoadsBloc>().add(const LoadsFetchRequested()),
+            child: const Text('Yangilash'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: const TextStyle(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () =>
+                context.read<LoadsBloc>().add(const LoadsFetchRequested()),
+            child: const Text('Qayta urinish'),
+          ),
+        ],
       ),
     );
   }
