@@ -43,15 +43,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildProfileCard(user),
               const SizedBox(height: 16),
               _buildSection([
+                _buildMenuItem(Icons.badge_outlined, 'Haydovchi profili',
+                    onTap: () => context.push('/driver-profile')),
                 _buildMenuItem(Icons.business, 'Kompaniya',
                     onTap: () => context.push('/companies')),
                 _buildMenuItem(Icons.directions_car, 'Transportlar',
                     onTap: () => context.push('/vehicles')),
-                _buildMenuItem(Icons.description, 'Hujjatlar'),
               ]),
               const SizedBox(height: 12),
               _buildSection([
-                _buildMenuItem(Icons.notifications_outlined, 'Bildirishnomalar'),
+                _buildMenuItem(
+                    Icons.notifications_outlined, 'Bildirishnomalar',
+                    onTap: () => context.push('/notifications')),
                 _buildMenuItem(Icons.language, 'Til'),
                 _buildMenuItem(Icons.help_outline, 'Yordam'),
               ]),

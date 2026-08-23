@@ -6,6 +6,8 @@ import '../../features/shipment/data/shipment_repository.dart';
 import '../../features/chat/data/chat_repository.dart';
 import '../../features/profile/data/user_repository.dart';
 import '../../features/vehicles/data/vehicle_repository.dart';
+import '../../features/companies/data/company_repository.dart';
+import '../../features/notifications/data/notification_repository.dart';
 
 class ServiceLocator {
   ServiceLocator._();
@@ -20,6 +22,8 @@ class ServiceLocator {
   late final ChatRepository chatRepository;
   late final UserRepository userRepository;
   late final VehicleRepository vehicleRepository;
+  late final CompanyRepository companyRepository;
+  late final NotificationRepository notificationRepository;
 
   void init() {
     apiClient = ApiClient();
@@ -30,6 +34,8 @@ class ServiceLocator {
     chatRepository = ChatRepository(apiClient);
     userRepository = UserRepository(apiClient);
     vehicleRepository = VehicleRepository(apiClient);
+    companyRepository = CompanyRepository(apiClient);
+    notificationRepository = NotificationRepository(apiClient);
   }
 }
 

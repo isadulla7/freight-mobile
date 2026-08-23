@@ -6,6 +6,14 @@ class VehicleRepository {
 
   VehicleRepository(this._api);
 
+  Future<List<VehicleResponse>> getMyVehicles() async {
+    final response = await _api.dio.get('/vehicles');
+    final data = response.data as Map<String, dynamic>;
+    return (data['vehicles'] as List<dynamic>)
+        .map((e) => VehicleResponse.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<String> createVehicle(CreateVehiclePayload payload) async {
     final response = await _api.dio.post('/vehicles', data: payload.toJson());
     final data = response.data as Map<String, dynamic>;

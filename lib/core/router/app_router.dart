@@ -16,6 +16,9 @@ import '../../features/load_detail/presentation/load_detail_screen.dart';
 import '../../features/vehicles/presentation/vehicles_screen.dart';
 import '../../features/vehicles/presentation/create_vehicle_screen.dart';
 import '../../features/companies/presentation/companies_screen.dart';
+import '../../features/companies/presentation/create_company_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/profile/presentation/driver_profile_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -110,6 +113,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/companies',
       builder: (context, state) => const CompaniesScreen(),
+    ),
+    GoRoute(
+      path: '/companies/create',
+      builder: (context, state) => const CreateCompanyScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/driver-profile',
+      builder: (context, state) => const DriverProfileScreen(),
     ),
   ],
 );
