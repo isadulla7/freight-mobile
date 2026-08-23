@@ -1,9 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/status_badge.dart';
+import '../bloc/load_detail_bloc.dart';
+import '../../loads/data/models/load_models.dart';
+import '../../offers/data/models/offer_models.dart';
+import '../../offers/presentation/create_offer_sheet.dart';
 
 class LoadDetailScreen extends StatelessWidget {
   final String loadId;
   const LoadDetailScreen({super.key, required this.loadId});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => LoadDetailBloc(sl.loadRepository, sl.offerRepository)
+        ..add(LoadDetailFetchRequested(loadId)),
+      child: _LoadDetailView(loadId: loadId),
+    );
+  }
+}
+
+class _LoadDetailView extends StatelessWidget {
+  final String loadId;
+  const _LoadDetailView({required this.loadId});
 
   @override
   Widget build(BuildContext context) {
@@ -18,33 +39,81 @@ class LoadDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildMap(),
-            _buildRouteHeader(),
-            _buildDetails(),
-            _buildCtaButton(context),
-            const SizedBox(height: 24),
-          ],
-        ),
+      body: BlocConsumer<LoadDetailBloc, LoadDetailState>(
+        listener: (context, state) {
+          if (state is LoadDetailOfferSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Taklif muvaffaqiyatli yuborildi')),
+            );
+            context.read<LoadDetailBloc>().add(LoadDetailFetchRequested(loadId));
+          } else if (state is LoadDetailError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is LoadDetailLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state is LoadDetailLoaded) {
+            return _buildContent(context, state.load, state.offers);
+          }
+          if (state is LoadDetailError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(state.message),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => context
+                        .read<LoadDetailBloc>()
+                        .add(LoadDetailFetchRequested(loadId)),
+                    child: const Text('Qayta urinish'),
+                  ),
+                ],
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
       ),
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildContent(
+    BuildContext context,
+    LoadResponse load,
+    List<OfferResponse> offers,
+  ) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildMap(load),
+          _buildRouteHeader(load),
+          _buildDetails(load),
+          if (offers.isNotEmpty) _buildOffersList(offers),
+          if (load.status == 'PUBLISHED') _buildCtaButton(context),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMap(LoadResponse load) {
     return Container(
-      height: 220,
+      height: 200,
       color: AppColors.primarySurface,
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.map_outlined, size: 48, color: AppColors.primary),
-            SizedBox(height: 8),
+            const Icon(Icons.map_outlined, size: 48, color: AppColors.primary),
+            const SizedBox(height: 8),
             Text(
-              'Toshkent → Samarqand',
-              style: TextStyle(
+              '${load.pickupCity} → ${load.deliveryCity}',
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w500,
               ),
@@ -55,28 +124,45 @@ class LoadDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRouteHeader() {
+  Widget _buildRouteHeader(LoadResponse load) {
+    final statusBadge = switch (load.status) {
+      'DRAFT' => BadgeType.draft,
+      'PUBLISHED' => BadgeType.published,
+      'MATCHED' => BadgeType.matched,
+      'CANCELLED' => BadgeType.cancelled,
+      _ => BadgeType.draft,
+    };
+
+    final statusLabel = switch (load.status) {
+      'DRAFT' => 'Qoralama',
+      'PUBLISHED' => 'Faol',
+      'MATCHED' => 'Mos topildi',
+      'CANCELLED' => 'Bekor',
+      'EXPIRED' => 'Muddati tugadi',
+      _ => load.status,
+    };
+
     return Container(
       padding: const EdgeInsets.all(16),
       color: AppColors.surface,
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Toshkent → Samarqand',
-                  style: TextStyle(
+                  '${load.pickupCity} → ${load.deliveryCity}',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  '4 500 000 UZS',
-                  style: TextStyle(
+                  load.formattedPrice,
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
@@ -88,26 +174,25 @@ class LoadDetailScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.badgeGreen,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  '12 t',
-                  style: TextStyle(
-                    color: AppColors.badgeGreenText,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+              StatusBadge(label: statusLabel, type: statusBadge),
+              if (load.formattedWeight.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.badgeGreen,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    load.formattedWeight,
+                    style: const TextStyle(
+                      color: AppColors.badgeGreenText,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Takliflar: 7',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
+              ],
             ],
           ),
         ],
@@ -115,18 +200,40 @@ class LoadDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetails() {
-    final details = [
-      (Icons.local_shipping_outlined, 'Yuk turi', 'Tentli yuk'),
-      (Icons.inventory_2_outlined, 'Yuk tavsifi', 'Qurilish materiallari'),
-      (Icons.straighten, 'Yuk hajmi', '82 m³'),
-      (Icons.fitness_center, 'Yuk og\'irligi', '12 000 kg'),
-      (Icons.calendar_today_outlined, 'Yuklash sanasi', 'Bugun, 14:00'),
-      (Icons.location_on_outlined, 'Yuklash manzili', 'Toshkent, Sergeli tumani'),
-      (Icons.location_on, 'Tushirish manzili', 'Samarqand, Pastdarg\'om'),
-      (Icons.credit_card_outlined, 'To\'lov turi', 'Naqd / Hisob-kitob'),
-      (Icons.notes_outlined, 'Izoh', 'Orqa yuklash'),
+  Widget _buildDetails(LoadResponse load) {
+    final details = <(IconData, String, String)>[
+      if (load.cargoType != null)
+        (Icons.category_outlined, 'Yuk turi', load.cargoType!),
+      if (load.cargoDescription != null)
+        (Icons.inventory_2_outlined, 'Yuk tavsifi', load.cargoDescription!),
+      if (load.formattedVolume.isNotEmpty)
+        (Icons.straighten, 'Yuk hajmi', load.formattedVolume),
+      if (load.cargoWeightKg != null)
+        (Icons.fitness_center, 'Yuk og\'irligi', '${load.cargoWeightKg} kg'),
+      if (load.pricingMode != null)
+        (Icons.payments_outlined, 'Narx turi',
+            load.pricingMode == 'FIXED' ? 'Belgilangan' : 'Taklif asosida'),
+      if (load.routeType != null)
+        (Icons.route, 'Marshrut turi', load.routeType!),
     ];
+
+    for (final stop in load.stops) {
+      final label = switch (stop.stopType) {
+        'PICKUP' => 'Yuklash manzili',
+        'DELIVERY' => 'Tushirish manzili',
+        _ => 'To\'xtash joyi',
+      };
+      final icon = stop.stopType == 'PICKUP'
+          ? Icons.location_on_outlined
+          : Icons.location_on;
+      final value =
+          [stop.city, stop.address].where((s) => s != null && s.isNotEmpty).join(', ');
+      if (value.isNotEmpty) {
+        details.add((icon, label, value));
+      }
+    }
+
+    if (details.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -141,7 +248,8 @@ class LoadDetailScreen extends StatelessWidget {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     Icon(d.$1, size: 20, color: AppColors.textSecondary),
@@ -149,9 +257,7 @@ class LoadDetailScreen extends StatelessWidget {
                     Text(
                       d.$2,
                       style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
+                          fontSize: 14, color: AppColors.textSecondary),
                     ),
                     const Spacer(),
                     Flexible(
@@ -177,11 +283,76 @@ class LoadDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildOffersList(List<OfferResponse> offers) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Text(
+              'Takliflar (${offers.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          ...offers.map((offer) => ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primarySurface,
+                  child: Text(
+                    offer.formattedAmount.substring(0, 1),
+                    style: const TextStyle(color: AppColors.primary),
+                  ),
+                ),
+                title: Text(
+                  offer.formattedAmount,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: offer.message != null
+                    ? Text(offer.message!,
+                        maxLines: 1, overflow: TextOverflow.ellipsis)
+                    : null,
+                trailing: StatusBadge(
+                  label: offer.statusLabel,
+                  type: switch (offer.status) {
+                    'PENDING' => BadgeType.draft,
+                    'ACCEPTED' => BadgeType.published,
+                    'REJECTED' => BadgeType.cancelled,
+                    _ => BadgeType.draft,
+                  },
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCtaButton(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            builder: (_) => BlocProvider.value(
+              value: context.read<LoadDetailBloc>(),
+              child: CreateOfferSheet(loadId: loadId),
+            ),
+          );
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,

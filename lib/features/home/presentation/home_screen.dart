@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/load_card.dart';
+import '../../loads/bloc/loads_bloc.dart';
+import '../../loads/data/models/load_models.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<LoadsBloc>();
+    if (bloc.state is LoadsInitial) {
+      bloc.add(const LoadsFetchRequested());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +59,9 @@ class HomeScreen extends StatelessWidget {
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                    onPressed: () {},
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.white),
+                    onPressed: () => context.push('/notifications'),
                   ),
                   Positioned(
                     right: 10,
@@ -75,14 +93,16 @@ class HomeScreen extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_on_outlined, color: Colors.white, size: 16),
+                Icon(Icons.location_on_outlined,
+                    color: Colors.white, size: 16),
                 SizedBox(width: 6),
                 Text(
                   "Toshkent, O'zbekiston",
                   style: TextStyle(color: Colors.white, fontSize: 14),
                 ),
                 SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
+                Icon(Icons.keyboard_arrow_down,
+                    color: Colors.white, size: 16),
               ],
             ),
           ),
@@ -103,7 +123,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             _buildLoadsSection(context),
             const SizedBox(height: 16),
-            _buildQuickActions(),
+            _buildQuickActions(context),
             const SizedBox(height: 16),
             _buildBanner(),
             const SizedBox(height: 16),
@@ -143,43 +163,86 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          LoadCard(
-            origin: 'Toshkent',
-            destination: 'Samarqand',
-            weight: '12 t',
-            price: '4 500 000 UZS',
-            date: 'Bugun, 14:00',
-            onTap: () => context.push('/loads/1'),
-          ),
-          const Divider(indent: 16, endIndent: 16),
-          LoadCard(
-            origin: 'Toshkent',
-            destination: "Farg'ona",
-            weight: '8 t',
-            price: '3 200 000 UZS',
-            date: 'Bugun, 16:30',
-            onTap: () => context.push('/loads/2'),
-          ),
-          const Divider(indent: 16, endIndent: 16),
-          LoadCard(
-            origin: 'Toshkent',
-            destination: 'Buxoro',
-            weight: '20 t',
-            price: '6 800 000 UZS',
-            date: 'Ertaga, 09:00',
-            onTap: () => context.push('/loads/3'),
+          BlocBuilder<LoadsBloc, LoadsState>(
+            builder: (context, state) {
+              if (state is LoadsLoading) {
+                return const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (state is LoadsLoaded && state.loads.isNotEmpty) {
+                final loads = state.loads.take(3).toList();
+                return _buildLoadsList(context, loads);
+              }
+              if (state is LoadsError) {
+                return Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Yuklarni yuklashda xatolik',
+                        style: TextStyle(
+                            fontSize: 14, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => context
+                            .read<LoadsBloc>()
+                            .add(const LoadsFetchRequested()),
+                        child: const Text('Qayta urinish'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Hozircha yuklar mavjud emas',
+                  style: TextStyle(
+                      fontSize: 14, color: AppColors.textSecondary),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildLoadsList(BuildContext context, List<LoadResponse> loads) {
+    return Column(
+      children: loads.asMap().entries.map((entry) {
+        final load = entry.value;
+        return Column(
+          children: [
+            LoadCard(
+              origin: load.pickupCity,
+              destination: load.deliveryCity,
+              weight: load.formattedWeight.isNotEmpty
+                  ? load.formattedWeight
+                  : '-',
+              price: load.formattedPrice,
+              date: '',
+              onTap: () => context.push('/loads/${load.loadId}'),
+            ),
+            if (entry.key < loads.length - 1)
+              const Divider(indent: 16, endIndent: 16),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
     final actions = [
-      ('Yuk qidirish', Icons.search),
-      ('Yuk joylash', Icons.add_circle_outline),
-      ('Mening\nyuklarim', Icons.description_outlined),
-      ('Sevimlilar', Icons.star_outline),
+      ('Yuk qidirish', Icons.search, () => context.go('/loads')),
+      ('Yuk joylash', Icons.add_circle_outline,
+          () => context.push('/loads/create')),
+      ('Yetkazish', Icons.local_shipping_outlined,
+          () => context.go('/shipments')),
+      ('Profil', Icons.person_outline, () => context.go('/profile')),
     ];
 
     return Padding(
@@ -199,28 +262,32 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: actions.map((a) {
-              return Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.divider, width: 0.5),
+              return GestureDetector(
+                onTap: a.$3,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border:
+                            Border.all(color: AppColors.divider, width: 0.5),
+                      ),
+                      child: Icon(a.$2, color: AppColors.primary, size: 28),
                     ),
-                    child: Icon(a.$2, color: AppColors.primary, size: 28),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    a.$1,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                    const SizedBox(height: 6),
+                    Text(
+                      a.$1,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             }).toList(),
           ),
@@ -264,7 +331,8 @@ class HomeScreen extends StatelessWidget {
                 SizedBox(height: 2),
                 Text(
                   'Tasdiqlangan yuk jo\'natuvchilar va tashuvchilar',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),
