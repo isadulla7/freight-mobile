@@ -7,6 +7,7 @@ import '../../features/chat/data/chat_repository.dart';
 import '../../features/profile/data/user_repository.dart';
 import '../../features/vehicles/data/vehicle_repository.dart';
 import '../../features/companies/data/company_repository.dart';
+import '../../features/companies/data/company_lookup_repository.dart';
 import '../../features/notifications/data/notification_repository.dart';
 
 class ServiceLocator {
@@ -23,6 +24,7 @@ class ServiceLocator {
   late final UserRepository userRepository;
   late final VehicleRepository vehicleRepository;
   late final CompanyRepository companyRepository;
+  late final CompanyLookupRepository companyLookupRepository;
   late final NotificationRepository notificationRepository;
 
   void init() {
@@ -35,6 +37,8 @@ class ServiceLocator {
     userRepository = UserRepository(apiClient);
     vehicleRepository = VehicleRepository(apiClient);
     companyRepository = CompanyRepository(apiClient);
+    // Tashqi reyestr xizmati — apiClient'dan foydalanmaydi.
+    companyLookupRepository = CompanyLookupRepository();
     notificationRepository = NotificationRepository(apiClient);
   }
 }
