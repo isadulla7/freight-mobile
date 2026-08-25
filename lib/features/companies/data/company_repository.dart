@@ -6,6 +6,14 @@ class CompanyRepository {
 
   CompanyRepository(this._api);
 
+  Future<List<CompanyResponse>> getMyCompanies() async {
+    final response = await _api.dio.get('/companies/me');
+    final data = response.data as Map<String, dynamic>;
+    return (data['companies'] as List<dynamic>)
+        .map((e) => CompanyResponse.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<String> createCompany(CreateCompanyPayload payload) async {
     final response = await _api.dio.post('/companies', data: payload.toJson());
     final data = response.data as Map<String, dynamic>;

@@ -32,11 +32,13 @@ class UserResponse {
 class DriverEligibilityResponse {
   final bool eligible;
   final bool hasDriverProfile;
+  final String? profileId;
   final String? verificationStatus;
 
   const DriverEligibilityResponse({
     required this.eligible,
     required this.hasDriverProfile,
+    this.profileId,
     this.verificationStatus,
   });
 
@@ -44,6 +46,7 @@ class DriverEligibilityResponse {
     return DriverEligibilityResponse(
       eligible: json['eligible'] as bool,
       hasDriverProfile: json['hasDriverProfile'] as bool,
+      profileId: json['profileId'] as String?,
       verificationStatus: json['verificationStatus'] as String?,
     );
   }

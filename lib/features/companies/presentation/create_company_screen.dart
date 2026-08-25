@@ -16,16 +16,12 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _innController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _phoneController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _innController.dispose();
-    _addressController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -35,15 +31,9 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
     setState(() => _isSubmitting = true);
     try {
       await sl.companyRepository.createCompany(CreateCompanyPayload(
-        name: _nameController.text.trim(),
-        inn: _innController.text.trim().isNotEmpty
+        legalName: _nameController.text.trim(),
+        businessIdentifier: _innController.text.trim().isNotEmpty
             ? _innController.text.trim()
-            : null,
-        legalAddress: _addressController.text.trim().isNotEmpty
-            ? _addressController.text.trim()
-            : null,
-        contactPhone: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
             : null,
       ));
       if (mounted) {
@@ -95,26 +85,6 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
                   labelText: 'INN (ixtiyoriy)',
                   hintText: '123456789',
                   prefixIcon: Icon(Icons.numbers),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 16),
-            _buildCard([
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Yuridik manzil (ixtiyoriy)',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Kontakt telefon (ixtiyoriy)',
-                  hintText: '+998 90 123 45 67',
-                  prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),
             ]),
