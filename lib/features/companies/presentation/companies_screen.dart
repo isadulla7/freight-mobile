@@ -14,12 +14,34 @@ class CompaniesScreen extends StatefulWidget {
 
 class _CompaniesScreenState extends State<CompaniesScreen> {
   CompanyResponse? _company;
-  bool _isLoading = false;
+  bool _isLoading = true;
   bool _hasCompany = false;
 
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _isLoading = true);
+    try {
+      final companies = await sl.companyRepository.getMyCompanies();
+      if (companies.isNotEmpty) {
+        setState(() {
+          _company = companies.first;
+          _hasCompany = true;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _hasCompany = false;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -27,7 +49,11 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Kompaniya')),
-      body: _hasCompany ? _buildCompanyView() : _buildCreateView(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _hasCompany
+              ? _buildCompanyView()
+              : _buildCreateView(),
     );
   }
 
@@ -68,7 +94,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               onPressed: () async {
                 final created = await context.push<bool>('/companies/create');
                 if (created == true && mounted) {
-                  setState(() => _hasCompany = true);
+                  _load();
                 }
               },
               icon: const Icon(Icons.add),
@@ -136,12 +162,10 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
           ),
           child: Column(
             children: [
-              if (c.inn != null)
-                _detailRow(Icons.numbers, 'INN', c.inn!),
-              if (c.legalAddress != null)
-                _detailRow(Icons.location_on_outlined, 'Manzil', c.legalAddress!),
-              if (c.contactPhone != null)
-                _detailRow(Icons.phone_outlined, 'Telefon', c.contactPhone!),
+              if (c.businessIdentifier != null)
+                _detailRow(Icons.numbers, 'INN', c.businessIdentifier!),
+              if (c.displayName != null)
+                _detailRow(Icons.label_outlined, 'Ko\'rsatiladigan nom', c.displayName!),
               _detailRow(Icons.calendar_today_outlined, 'Yaratilgan',
                   _formatDate(c.createdAt)),
             ],

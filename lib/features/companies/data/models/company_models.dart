@@ -1,18 +1,16 @@
 class CompanyResponse {
   final String companyId;
-  final String name;
-  final String? inn;
-  final String? legalAddress;
-  final String? contactPhone;
+  final String legalName;
+  final String? displayName;
+  final String? businessIdentifier;
   final String status;
   final String createdAt;
 
   const CompanyResponse({
     required this.companyId,
-    required this.name,
-    this.inn,
-    this.legalAddress,
-    this.contactPhone,
+    required this.legalName,
+    this.displayName,
+    this.businessIdentifier,
     required this.status,
     required this.createdAt,
   });
@@ -20,41 +18,38 @@ class CompanyResponse {
   factory CompanyResponse.fromJson(Map<String, dynamic> json) {
     return CompanyResponse(
       companyId: json['companyId'] as String,
-      name: json['name'] as String,
-      inn: json['inn'] as String?,
-      legalAddress: json['legalAddress'] as String?,
-      contactPhone: json['contactPhone'] as String?,
+      legalName: json['legalName'] as String,
+      displayName: json['displayName'] as String?,
+      businessIdentifier: json['businessIdentifier'] as String?,
       status: json['status'] as String,
       createdAt: json['createdAt'] as String,
     );
   }
 
+  String get name => displayName ?? legalName;
+
   String get statusLabel => switch (status) {
         'ACTIVE' => 'Faol',
-        'SUSPENDED' => 'To\'xtatilgan',
-        'PENDING' => 'Kutilmoqda',
+        'ARCHIVED' => 'Arxivlangan',
         _ => status,
       };
 }
 
 class CreateCompanyPayload {
-  final String name;
-  final String? inn;
-  final String? legalAddress;
-  final String? contactPhone;
+  final String legalName;
+  final String? displayName;
+  final String? businessIdentifier;
 
   const CreateCompanyPayload({
-    required this.name,
-    this.inn,
-    this.legalAddress,
-    this.contactPhone,
+    required this.legalName,
+    this.displayName,
+    this.businessIdentifier,
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        if (inn != null) 'inn': inn,
-        if (legalAddress != null) 'legalAddress': legalAddress,
-        if (contactPhone != null) 'contactPhone': contactPhone,
+        'legalName': legalName,
+        if (displayName != null) 'displayName': displayName,
+        if (businessIdentifier != null) 'businessIdentifier': businessIdentifier,
       };
 }
 
