@@ -34,6 +34,7 @@ class _CreateOfferSheetState extends State<CreateOfferSheet> {
   Future<void> _loadData() async {
     try {
       final eligibility = await sl.userRepository.getDriverEligibility();
+      if (!mounted) return;
       if (!eligibility.hasDriverProfile || eligibility.profileId == null) {
         setState(() {
           _error = 'Avval haydovchi profilini yarating';
@@ -43,6 +44,7 @@ class _CreateOfferSheetState extends State<CreateOfferSheet> {
       }
 
       final vehicles = await sl.vehicleRepository.getMyVehicles();
+      if (!mounted) return;
       if (vehicles.isEmpty) {
         setState(() {
           _error = 'Avval transport qo\'shing';
@@ -51,13 +53,26 @@ class _CreateOfferSheetState extends State<CreateOfferSheet> {
         return;
       }
 
+      // Faqat ACTIVE transportga taklif berish mumkin. Filtrdan keyin
+      // ro'yxat bo'shab qolsa buni aytish kerak — aks holda tugma
+      // bosilganda hech narsa bo'lmaydi.
+      final active = vehicles.where((v) => v.status == 'ACTIVE').toList();
+      if (active.isEmpty) {
+        setState(() {
+          _error = 'Faol transport yo\'q. Transportni faollashtiring';
+          _isLoading = false;
+        });
+        return;
+      }
+
       setState(() {
         _driverProfileId = eligibility.profileId;
-        _vehicles = vehicles.where((v) => v.status == 'ACTIVE').toList();
-        if (_vehicles.isNotEmpty) _selectedVehicle = _vehicles.first;
+        _vehicles = active;
+        _selectedVehicle = active.first;
         _isLoading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Ma\'lumotlarni yuklashda xatolik';
         _isLoading = false;

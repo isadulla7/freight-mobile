@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -16,8 +15,28 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
 
+  /// Kod haqiqatan yuborilganmi. Faqat AuthOtpSent kelganda true bo'ladi.
+  bool _otpSent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Raqam o'zgartirilsa, kod kiritish bosqichidan qaytamiz.
+    _phoneController.addListener(_onPhoneChanged);
+  }
+
+  void _onPhoneChanged() {
+    if (_otpSent) {
+      setState(() {
+        _otpSent = false;
+        _otpController.clear();
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _phoneController.removeListener(_onPhoneChanged);
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
@@ -59,16 +78,21 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthAuthenticated) {
-          context.go('/home');
+        // Kod haqiqatan yuborilganini faqat shu yerda belgilaymiz.
+        // AuthError'dan xulosa chiqarish mumkin emas — u ham yuborish,
+        // ham tekshirish bosqichida kelishi mumkin.
+        if (state is AuthOtpSent) {
+          setState(() => _otpSent = true);
         } else if (state is AuthError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.message)),
           );
         }
+        // AuthAuthenticated'da navigatsiya kerak emas — router'ning
+        // refreshListenable'i o'zi /home ga o'tkazadi.
       },
       builder: (context, state) {
-        final isOtpSent = state is AuthOtpSent;
+        final isOtpSent = _otpSent;
         final isLoading = state is AuthLoading;
         final phoneNumber = switch (state) {
           AuthOtpSent s => s.phoneNumber,
@@ -114,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icon(Icons.phone_outlined),
                     ),
                   ),
-                  if (isOtpSent || phoneNumber != null) ...[
+                  if (isOtpSent) ...[
                     const SizedBox(height: 16),
                     TextField(
                       controller: _otpController,
@@ -138,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: isLoading
                         ? null
                         : () {
-                            if (!isOtpSent && phoneNumber == null) {
+                            if (!isOtpSent) {
                               _requestOtp();
                             } else {
                               _verifyOtp(
@@ -155,9 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : Text(isOtpSent || phoneNumber != null
-                            ? 'Kirish'
-                            : 'Kod yuborish'),
+                        : Text(isOtpSent ? 'Kirish' : 'Kod yuborish'),
                   ),
                   if (isOtpSent) ...[
                     const SizedBox(height: 12),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../profile/bloc/profile_bloc.dart';
 import '../bloc/chat_bloc.dart';
 import '../data/models/chat_models.dart';
 
@@ -64,7 +65,15 @@ class _ChatViewState extends State<_ChatView> {
       body: Column(
         children: [
           Expanded(
-            child: BlocBuilder<ChatBloc, ChatState>(
+            child: BlocConsumer<ChatBloc, ChatState>(
+              listenWhen: (prev, next) =>
+                  next is ChatLoaded && next.transientError != null,
+              listener: (context, state) {
+                final error = (state as ChatLoaded).transientError;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error!)),
+                );
+              },
               builder: (context, state) {
                 if (state is ChatLoading) {
                   return const Center(child: CircularProgressIndicator());
@@ -95,6 +104,11 @@ class _ChatViewState extends State<_ChatView> {
       );
     }
 
+    // O'z xabarlarimizni ajratish uchun joriy foydalanuvchi ID'si kerak.
+    final profileState = context.watch<ProfileBloc>().state;
+    final currentUserId =
+        profileState is ProfileLoaded ? profileState.user.userId : null;
+
     return ListView.builder(
       controller: _scrollController,
       reverse: true,
@@ -102,7 +116,10 @@ class _ChatViewState extends State<_ChatView> {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final msg = messages[messages.length - 1 - index];
-        return _MessageBubble(message: msg);
+        return _MessageBubble(
+          message: msg,
+          isMine: currentUserId != null && msg.senderUserId == currentUserId,
+        );
       },
     );
   }
@@ -151,12 +168,13 @@ class _ChatViewState extends State<_ChatView> {
 
 class _MessageBubble extends StatelessWidget {
   final MessageResponse message;
-  const _MessageBubble({required this.message});
+  final bool isMine;
+  const _MessageBubble({required this.message, this.isMine = false});
 
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -164,7 +182,7 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: isMine ? AppColors.primarySurface : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),

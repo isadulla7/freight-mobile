@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildProfileCard(user),
+              _buildProfileCard(user, state),
               const SizedBox(height: 16),
               _buildSection([
                 _buildMenuItem(Icons.badge_outlined, 'Haydovchi profili',
@@ -55,8 +55,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildMenuItem(
                     Icons.notifications_outlined, 'Bildirishnomalar',
                     onTap: () => context.push('/notifications')),
-                _buildMenuItem(Icons.language, 'Til'),
-                _buildMenuItem(Icons.help_outline, 'Yordam'),
               ]),
               const SizedBox(height: 12),
               _buildSection([
@@ -64,10 +62,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icons.logout,
                   'Chiqish',
                   color: AppColors.error,
-                  onTap: () {
-                    context.read<AuthBloc>().add(const LogoutRequested());
-                    context.go('/login');
-                  },
+                  // Faqat event yuboramiz — login ekraniga o'tishni
+                  // router'ning refreshListenable'i hal qiladi.
+                  onTap: () =>
+                      context.read<AuthBloc>().add(const LogoutRequested()),
                 ),
               ]),
             ],
@@ -77,8 +75,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileCard(UserResponse? user) {
-    final name = user?.displayName ?? '...';
+  Widget _buildProfileCard(UserResponse? user, ProfileState state) {
+    final isLoading = state is ProfileLoading || state is ProfileInitial;
+    final hasError = state is ProfileError;
+
+    final name = user?.displayName ?? (hasError ? 'Yuklanmadi' : '...');
     final initials = user?.initials ?? '?';
 
     return Container(
@@ -93,14 +94,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 30,
             backgroundColor: AppColors.primaryDark,
-            child: Text(
-              initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
           const SizedBox(width: 16),
           Column(
@@ -114,6 +124,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: AppColors.textPrimary,
                 ),
               ),
+              if (hasError) ...[
+                const SizedBox(height: 4),
+                InkWell(
+                  onTap: () => context
+                      .read<ProfileBloc>()
+                      .add(const ProfileFetchRequested()),
+                  child: const Text(
+                    'Qayta urinish',
+                    style: TextStyle(fontSize: 13, color: AppColors.error),
+                  ),
+                ),
+              ],
               if (user != null) ...[
                 const SizedBox(height: 2),
                 Container(

@@ -34,6 +34,12 @@ class LoadCreateRequested extends LoadsEvent {
   List<Object?> get props => [payload];
 }
 
+/// Logout'da chaqiriladi — keyingi foydalanuvchi oldingisining
+/// yuklarini ko'rmasligi uchun.
+class LoadsReset extends LoadsEvent {
+  const LoadsReset();
+}
+
 // States
 sealed class LoadsState extends Equatable {
   const LoadsState();
@@ -51,9 +57,15 @@ class LoadsLoading extends LoadsState {
 
 class LoadsLoaded extends LoadsState {
   final List<LoadResponse> loads;
-  const LoadsLoaded(this.loads);
+
+  /// Har bir yuklashda ortadi. Ro'yxat uzunligi o'zgarmagan holatda ham
+  /// (masalan, narx yoki status yangilanganda) yangi state emit qilinishini
+  /// kafolatlaydi — aks holda Equatable uni bir xil deb tashlab yuboradi.
+  final int revision;
+
+  const LoadsLoaded(this.loads, {this.revision = 0});
   @override
-  List<Object?> get props => [loads.length];
+  List<Object?> get props => [loads.length, revision];
 }
 
 class LoadsError extends LoadsState {
@@ -76,11 +88,13 @@ class LoadsBloc extends Bloc<LoadsEvent, LoadsState> {
   double _lastLat = 41.2995;
   double _lastLng = 69.2401;
   double _lastRadius = 100000;
+  int _revision = 0;
 
   LoadsBloc(this._repository) : super(const LoadsInitial()) {
     on<LoadsFetchRequested>(_onFetch);
     on<LoadsRefreshRequested>(_onRefresh);
     on<LoadCreateRequested>(_onCreate);
+    on<LoadsReset>(_onReset);
   }
 
   Future<void> _onFetch(
@@ -91,31 +105,26 @@ class LoadsBloc extends Bloc<LoadsEvent, LoadsState> {
     _lastLat = event.latitude;
     _lastLng = event.longitude;
     _lastRadius = event.radiusMeters;
-    try {
-      final loads = await _repository.searchAndFetchLoads(
-        latitude: event.latitude,
-        longitude: event.longitude,
-        radiusMeters: event.radiusMeters,
-      );
-      emit(LoadsLoaded(loads));
-    } catch (e) {
-      emit(LoadsError('Yuklar yuklanmadi: $e'));
-    }
+    await _load(emit);
   }
 
   Future<void> _onRefresh(
     LoadsRefreshRequested event,
     Emitter<LoadsState> emit,
   ) async {
+    await _load(emit);
+  }
+
+  Future<void> _load(Emitter<LoadsState> emit) async {
     try {
       final loads = await _repository.searchAndFetchLoads(
         latitude: _lastLat,
         longitude: _lastLng,
         radiusMeters: _lastRadius,
       );
-      emit(LoadsLoaded(loads));
+      emit(LoadsLoaded(loads, revision: ++_revision));
     } catch (e) {
-      emit(LoadsError('Yuklar yuklanmadi: $e'));
+      emit(LoadsError(_message(e, 'Yuklar yuklanmadi')));
     }
   }
 
@@ -126,9 +135,31 @@ class LoadsBloc extends Bloc<LoadsEvent, LoadsState> {
     emit(const LoadsLoading());
     try {
       final loadId = await _repository.createLoad(event.payload);
+      // Yuk DRAFT holatida yaratiladi — publish qilinmasa qidiruvda
+      // ko'rinmaydi va unga taklif berib bo'lmaydi.
+      await _repository.publishLoad(loadId);
       emit(LoadCreateSuccess(loadId));
+      // Ro'yxatni yangilaymiz, aks holda LoadCreateSuccess state'i
+      // ekranda "yuk yo'q" bo'lib qoladi.
+      await _load(emit);
     } catch (e) {
-      emit(LoadsError('Yuk yaratishda xatolik: $e'));
+      emit(LoadsError(_message(e, 'Yuk yaratishda xatolik')));
     }
+  }
+
+  void _onReset(LoadsReset event, Emitter<LoadsState> emit) {
+    _revision = 0;
+    emit(const LoadsInitial());
+  }
+
+  /// Foydalanuvchiga xom `DioException` matnini ko'rsatmaslik uchun.
+  String _message(Object e, String fallback) {
+    final text = e.toString();
+    if (text.contains('SocketException') ||
+        text.contains('connection error') ||
+        text.contains('Connection refused')) {
+      return 'Internet aloqasi yo\'q';
+    }
+    return fallback;
   }
 }

@@ -43,9 +43,24 @@ class ChatLoading extends ChatState {
 class ChatLoaded extends ChatState {
   final List<MessageResponse> messages;
   final String conversationId;
-  const ChatLoaded({required this.messages, required this.conversationId});
+
+  /// Xabar matni o'zgarib, soni o'zgarmagan holatda ham UI yangilanishi uchun.
+  final int revision;
+
+  /// Yuborish muvaffaqiyatsiz bo'lganda — suhbatni yo'qotmasdan
+  /// xatoni ko'rsatish uchun.
+  final String? transientError;
+
+  const ChatLoaded({
+    required this.messages,
+    required this.conversationId,
+    this.revision = 0,
+    this.transientError,
+  });
+
   @override
-  List<Object?> get props => [messages.length, conversationId];
+  List<Object?> get props =>
+      [messages.length, conversationId, revision, transientError];
 }
 
 class ChatError extends ChatState {
@@ -58,6 +73,7 @@ class ChatError extends ChatState {
 // BLoC
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _repository;
+  int _revision = 0;
 
   ChatBloc(this._repository) : super(const ChatInitial()) {
     on<ChatMessagesFetchRequested>(_onFetch);
@@ -68,15 +84,28 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatMessagesFetchRequested event,
     Emitter<ChatState> emit,
   ) async {
-    emit(const ChatLoading());
+    // Suhbat allaqachon yuklangan bo'lsa uni o'chirmaymiz —
+    // qayta yuklashda xabarlar ko'z oldida turaveradi.
+    if (state is! ChatLoaded) emit(const ChatLoading());
     try {
       final messages = await _repository.getMessages(event.conversationId);
       emit(ChatLoaded(
         messages: messages,
         conversationId: event.conversationId,
+        revision: ++_revision,
       ));
     } catch (e) {
-      emit(const ChatError('Xabarlar yuklanmadi'));
+      final previous = state;
+      if (previous is ChatLoaded) {
+        emit(ChatLoaded(
+          messages: previous.messages,
+          conversationId: previous.conversationId,
+          revision: ++_revision,
+          transientError: 'Xabarlar yangilanmadi',
+        ));
+      } else {
+        emit(const ChatError('Xabarlar yuklanmadi'));
+      }
     }
   }
 
@@ -84,11 +113,22 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatMessageSent event,
     Emitter<ChatState> emit,
   ) async {
+    final previous = state;
     try {
       await _repository.sendMessage(event.conversationId, event.body);
       add(ChatMessagesFetchRequested(event.conversationId));
     } catch (e) {
-      emit(const ChatError('Xabar yuborilmadi'));
+      // Bitta xabar yuborilmagani butun suhbatni yo'q qilmasligi kerak.
+      if (previous is ChatLoaded) {
+        emit(ChatLoaded(
+          messages: previous.messages,
+          conversationId: previous.conversationId,
+          revision: ++_revision,
+          transientError: 'Xabar yuborilmadi',
+        ));
+      } else {
+        emit(const ChatError('Xabar yuborilmadi'));
+      }
     }
   }
 }

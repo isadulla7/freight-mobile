@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/geo/uz_cities.dart';
 import '../../../core/theme/app_colors.dart';
 import '../bloc/loads_bloc.dart';
 import '../data/models/load_models.dart';
@@ -44,20 +45,32 @@ class _CreateLoadScreenState extends State<CreateLoadScreen> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
+    final pickupCity = _pickupCityController.text.trim();
+    final deliveryCity = _deliveryCityController.text.trim();
+
+    // Koordinatasiz yuk qidiruvda ko'rinmaydi, shuning uchun shahar nomi
+    // tanilmasa ham zaxira nuqtani beramiz.
+    final pickupCoords = UzCities.lookup(pickupCity) ?? UzCities.fallback;
+    final deliveryCoords = UzCities.lookup(deliveryCity) ?? UzCities.fallback;
+
     final stops = [
       LoadStopPayload(
         sequence: 1,
         stopType: 'PICKUP',
-        city: _pickupCityController.text.trim(),
+        city: pickupCity,
         address: _pickupAddressController.text.trim(),
         countryCode: 'UZ',
+        latitude: pickupCoords.$1,
+        longitude: pickupCoords.$2,
       ),
       LoadStopPayload(
         sequence: 2,
         stopType: 'DELIVERY',
-        city: _deliveryCityController.text.trim(),
+        city: deliveryCity,
         address: _deliveryAddressController.text.trim(),
         countryCode: 'UZ',
+        latitude: deliveryCoords.$1,
+        longitude: deliveryCoords.$2,
       ),
     ];
 

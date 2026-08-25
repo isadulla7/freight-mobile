@@ -15,7 +15,11 @@ class LoadDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => LoadDetailBloc(sl.loadRepository, sl.offerRepository)
+      create: (_) => LoadDetailBloc(
+        sl.loadRepository,
+        sl.offerRepository,
+        sl.shipmentRepository,
+      )
         ..add(LoadDetailFetchRequested(loadId)),
       child: _LoadDetailView(loadId: loadId),
     );
@@ -32,12 +36,6 @@ class _LoadDetailView extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Yuk tafsilotlari'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: BlocConsumer<LoadDetailBloc, LoadDetailState>(
         listener: (context, state) {
@@ -45,7 +43,11 @@ class _LoadDetailView extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Taklif muvaffaqiyatli yuborildi')),
             );
-            context.read<LoadDetailBloc>().add(LoadDetailFetchRequested(loadId));
+          } else if (state is LoadDetailLoaded &&
+              state.transientError != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.transientError!)),
+            );
           } else if (state is LoadDetailError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
@@ -93,7 +95,7 @@ class _LoadDetailView extends StatelessWidget {
           _buildMap(load),
           _buildRouteHeader(load),
           _buildDetails(load),
-          if (offers.isNotEmpty) _buildOffersList(offers),
+          if (offers.isNotEmpty) _buildOffersList(context, load, offers),
           if (load.status == 'PUBLISHED') _buildCtaButton(context),
           const SizedBox(height: 24),
         ],
@@ -283,7 +285,11 @@ class _LoadDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildOffersList(List<OfferResponse> offers) {
+  Widget _buildOffersList(
+    BuildContext context,
+    LoadResponse load,
+    List<OfferResponse> offers,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -321,19 +327,78 @@ class _LoadDetailView extends StatelessWidget {
                     ? Text(offer.message!,
                         maxLines: 1, overflow: TextOverflow.ellipsis)
                     : null,
-                trailing: StatusBadge(
-                  label: offer.statusLabel,
-                  type: switch (offer.status) {
-                    'PENDING' => BadgeType.draft,
-                    'ACCEPTED' => BadgeType.published,
-                    'REJECTED' => BadgeType.cancelled,
-                    _ => BadgeType.draft,
-                  },
-                ),
+                // Kutilayotgan taklifni qabul qilish yoki rad etish —
+                // busiz taklif hech qachon yetkazishga aylanmaydi.
+                trailing: offer.status == 'PENDING'
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Rad etish',
+                            icon: const Icon(Icons.close),
+                            color: AppColors.error,
+                            onPressed: () => context
+                                .read<LoadDetailBloc>()
+                                .add(LoadDetailOfferRejected(offer.offerId)),
+                          ),
+                          IconButton(
+                            tooltip: 'Qabul qilish',
+                            icon: const Icon(Icons.check),
+                            color: AppColors.primary,
+                            onPressed: () =>
+                                _confirmAccept(context, load, offer),
+                          ),
+                        ],
+                      )
+                    : StatusBadge(
+                        label: offer.statusLabel,
+                        type: switch (offer.status) {
+                          'ACCEPTED' => BadgeType.published,
+                          'REJECTED' => BadgeType.cancelled,
+                          _ => BadgeType.draft,
+                        },
+                      ),
               )),
         ],
       ),
     );
+  }
+
+  /// Taklifni qabul qilish yukni band qiladi va yetkazish yaratadi —
+  /// qaytarib bo'lmaydigan amal, shuning uchun tasdiq so'raymiz.
+  Future<void> _confirmAccept(
+    BuildContext context,
+    LoadResponse load,
+    OfferResponse offer,
+  ) async {
+    final bloc = context.read<LoadDetailBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Taklifni qabul qilasizmi?'),
+        content: Text(
+          '${offer.formattedAmount} — qabul qilingach yetkazish boshlanadi '
+          'va boshqa takliflar rad etiladi.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Bekor qilish'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Qabul qilish'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed ?? false) {
+      bloc.add(LoadDetailOfferAccepted(
+        offerId: offer.offerId,
+        expectedLoadVersion: load.version,
+      ));
+    }
   }
 
   Widget _buildCtaButton(BuildContext context) {

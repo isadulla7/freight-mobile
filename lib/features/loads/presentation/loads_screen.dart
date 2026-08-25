@@ -36,9 +36,6 @@ class _LoadsScreenState extends State<LoadsScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         centerTitle: false,
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-        ],
       ),
       body: Column(
         children: [
@@ -85,14 +82,6 @@ class _LoadsScreenState extends State<LoadsScreen> {
               ),
             );
           }),
-          ActionChip(
-            avatar: const Icon(Icons.tune, size: 16),
-            label: const Text('Filtrlar'),
-            onPressed: () {},
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
         ],
       ),
     );
@@ -111,7 +100,9 @@ class _LoadsScreenState extends State<LoadsScreen> {
           if (state.loads.isEmpty) return _buildEmptyState();
           return _buildLoadsList(state.loads);
         }
-        return _buildEmptyState();
+        // LoadsInitial / LoadCreateSuccess — ma'lumot hali yo'q, lekin
+        // bu "yuk yo'q" degani emas.
+        return const Center(child: CircularProgressIndicator());
       },
     );
   }
@@ -119,7 +110,12 @@ class _LoadsScreenState extends State<LoadsScreen> {
   Widget _buildLoadsList(List<LoadResponse> loads) {
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<LoadsBloc>().add(const LoadsRefreshRequested());
+        final bloc = context.read<LoadsBloc>();
+        bloc.add(const LoadsRefreshRequested());
+        // Spinner ma'lumot kelguncha aylanishi uchun kutamiz.
+        await bloc.stream.firstWhere(
+          (s) => s is LoadsLoaded || s is LoadsError,
+        );
       },
       child: Container(
         margin: const EdgeInsets.all(16),
@@ -145,7 +141,6 @@ class _LoadsScreenState extends State<LoadsScreen> {
               volume: load.formattedVolume.isNotEmpty
                   ? load.formattedVolume
                   : null,
-              showHeart: true,
               onTap: () => context.push('/loads/${load.loadId}'),
             );
           },

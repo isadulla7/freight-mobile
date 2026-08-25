@@ -16,6 +16,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
   CompanyResponse? _company;
   bool _isLoading = true;
   bool _hasCompany = false;
+  String? _error;
 
   @override
   void initState() {
@@ -24,23 +25,26 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final companies = await sl.companyRepository.getMyCompanies();
-      if (companies.isNotEmpty) {
-        setState(() {
-          _company = companies.first;
-          _hasCompany = true;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _hasCompany = false;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _company = companies.isNotEmpty ? companies.first : null;
+        _hasCompany = companies.isNotEmpty;
+        _isLoading = false;
+      });
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      // Tarmoq xatosini "kompaniyangiz yo'q" deb ko'rsatish mumkin emas —
+      // foydalanuvchi mavjud kompaniyaning dublikatini yaratib yuboradi.
+      setState(() {
+        _error = 'Kompaniya ma\'lumotlari yuklanmadi';
+        _isLoading = false;
+      });
     }
   }
 
@@ -51,9 +55,29 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       appBar: AppBar(title: const Text('Kompaniya')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _hasCompany
-              ? _buildCompanyView()
-              : _buildCreateView(),
+          : _error != null
+              ? _buildErrorView()
+              : _hasCompany
+                  ? _buildCompanyView()
+                  : _buildCreateView(),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+          const SizedBox(height: 16),
+          Text(
+            _error!,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: _load, child: const Text('Qayta urinish')),
+        ],
+      ),
     );
   }
 

@@ -17,6 +17,8 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
   ShipmentResponse? _shipment;
   List<StatusHistoryEntry> _history = [];
   bool _isLoading = true;
+  bool _isOpeningChat = false;
+  bool _isUpdatingStatus = false;
   String? _error;
 
   @override
@@ -35,16 +37,55 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
         sl.shipmentRepository.getShipment(widget.shipmentId),
         sl.shipmentRepository.getStatusHistory(widget.shipmentId),
       ]);
+      if (!mounted) return;
       setState(() {
         _shipment = results[0] as ShipmentResponse;
         _history = results[1] as List<StatusHistoryEntry>;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Ma\'lumotlarni yuklashda xatolik';
         _isLoading = false;
       });
+    }
+  }
+
+  /// Chat conversation ID shipment ID'dan farq qiladi — avval suhbatni
+  /// yaratib (yoki mavjudini olib), keyin uning ID'si bilan o'tamiz.
+  Future<void> _openChat() async {
+    final shipment = _shipment;
+    if (shipment == null) return;
+
+    setState(() => _isOpeningChat = true);
+    try {
+      final participants = <Map<String, String>>[
+        if (shipment.shipperUserId != null)
+          {'userId': shipment.shipperUserId!, 'role': 'SHIPPER'},
+        if (shipment.carrierUserId != null)
+          {'userId': shipment.carrierUserId!, 'role': 'CARRIER'},
+      ];
+
+      final conversation = await sl.chatRepository.getOrCreateShipmentConversation(
+        shipmentId: shipment.shipmentId,
+        participants: participants,
+      );
+
+      if (!mounted) return;
+      setState(() => _isOpeningChat = false);
+      context.push(
+        '/chat/${conversation.conversationId}',
+        extra: {
+          'title': 'Yetkazish #${shipment.shipmentId.substring(0, 8)}',
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isOpeningChat = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Suhbatni ochib bo\'lmadi')),
+      );
     }
   }
 
@@ -57,11 +98,14 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
         actions: [
           if (_shipment != null)
             IconButton(
-              icon: const Icon(Icons.chat_outlined),
-              onPressed: () => context.push(
-                '/chat/${_shipment!.shipmentId}',
-                extra: {'title': 'Yetkazish #${_shipment!.shipmentId.substring(0, 8)}'},
-              ),
+              icon: _isOpeningChat
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chat_outlined),
+              onPressed: _isOpeningChat ? null : _openChat,
             ),
         ],
       ),
@@ -107,6 +151,7 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
         children: [
           _buildInfoCard(s, badgeType),
           const SizedBox(height: 16),
+          _buildStatusActions(s),
           _buildDetailsCard(s),
           if (_history.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -116,6 +161,83 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Backend ruxsat bergan o'tishlar (UpdateShipmentStatus.ALLOWED_TRANSITIONS).
+  static const _nextStatuses = <String, List<(String, String)>>{
+    'CREATED': [('IN_TRANSIT', 'Yo\'lga chiqdim'), ('CANCELLED', 'Bekor qilish')],
+    'IN_TRANSIT': [('DELIVERED', 'Yetkazdim'), ('CANCELLED', 'Bekor qilish')],
+    'DELIVERED': [('COMPLETED', 'Yakunlash')],
+  };
+
+  Widget _buildStatusActions(ShipmentResponse s) {
+    final options = _nextStatuses[s.status];
+    if (options == null || options.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          for (final (status, label) in options) ...[
+            Expanded(
+              child: status == 'CANCELLED'
+                  ? OutlinedButton(
+                      onPressed: _isUpdatingStatus
+                          ? null
+                          : () => _updateStatus(status, label),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                      ),
+                      child: Text(label),
+                    )
+                  : FilledButton(
+                      onPressed: _isUpdatingStatus
+                          ? null
+                          : () => _updateStatus(status, label),
+                      child: Text(label),
+                    ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateStatus(String status, String label) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('$label?'),
+        content: const Text('Bu amalni qaytarib bo\'lmaydi.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Bekor qilish'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Tasdiqlash'),
+          ),
+        ],
+      ),
+    );
+    if (!(confirmed ?? false) || !mounted) return;
+
+    setState(() => _isUpdatingStatus = true);
+    try {
+      await sl.shipmentRepository
+          .updateStatus(widget.shipmentId, status: status);
+      if (!mounted) return;
+      setState(() => _isUpdatingStatus = false);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdatingStatus = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Holatni yangilab bo\'lmadi')),
+      );
+    }
   }
 
   Widget _buildInfoCard(ShipmentResponse s, BadgeType badgeType) {

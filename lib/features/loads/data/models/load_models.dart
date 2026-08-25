@@ -8,6 +8,11 @@ class LoadStopPayload {
   final String? city;
   final String? region;
 
+  /// Koordinatasiz yuk qidiruvda umuman ko'rinmaydi — backend
+  /// masofa bo'yicha (ST_DWithin) filtrlaydi.
+  final double? latitude;
+  final double? longitude;
+
   const LoadStopPayload({
     required this.sequence,
     required this.stopType,
@@ -17,18 +22,22 @@ class LoadStopPayload {
     this.countryCode,
     this.city,
     this.region,
+    this.latitude,
+    this.longitude,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'sequence': sequence,
       'stopType': stopType,
-      if (address != null) 'address': address,
-      if (contactName != null) 'contactName': contactName,
-      if (contactPhone != null) 'contactPhone': contactPhone,
-      if (countryCode != null) 'countryCode': countryCode,
-      if (city != null) 'city': city,
-      if (region != null) 'region': region,
+      'address': ?address,
+      'contactName': ?contactName,
+      'contactPhone': ?contactPhone,
+      'countryCode': ?countryCode,
+      'city': ?city,
+      'region': ?region,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
     };
   }
 }

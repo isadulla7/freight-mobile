@@ -46,7 +46,8 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
             if (state.shipments.isEmpty) return _buildEmpty();
             return _buildList(state.shipments);
           }
-          return _buildEmpty();
+          // ShipmentsInitial — hali yuklanmagan, "bo'sh" degani emas.
+          return const Center(child: CircularProgressIndicator());
         },
       ),
     );
@@ -55,7 +56,11 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
   Widget _buildList(List<ShipmentResponse> shipments) {
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<ShipmentsBloc>().add(const ShipmentsFetchRequested());
+        final bloc = context.read<ShipmentsBloc>();
+        bloc.add(const ShipmentsFetchRequested());
+        await bloc.stream.firstWhere(
+          (s) => s is ShipmentsLoaded || s is ShipmentsError,
+        );
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),

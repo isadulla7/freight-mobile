@@ -8,8 +8,25 @@ class ApiClient {
   static const _tokenKey = 'access_token';
   static const _refreshKey = 'refresh_token';
 
+  /// Endpointlar, ularda 401 kelsa token yangilash mantiqan noto'g'ri —
+  /// bu login oqimining o'zi.
+  static const _authPaths = {
+    '/auth/otp/request',
+    '/auth/otp/verify',
+    '/auth/refresh',
+  };
+
   final Dio dio;
   final FlutterSecureStorage _storage;
+
+  /// Sessiya tiklab bo'lmaydigan darajada yaroqsiz bo'lganda chaqiriladi
+  /// (refresh token ham ishlamadi). `main.dart` buni AuthBloc'ga ulaydi.
+  void Function()? onAuthFailure;
+
+  /// Bir vaqtda faqat bitta refresh ketishini ta'minlaydi — aks holda
+  /// parallel so'rovlar refresh tokenni bir necha marta almashtirib,
+  /// backend'ning reuse-detection mexanizmini ishga tushiradi.
+  Future<bool>? _refreshInFlight;
 
   ApiClient({Dio? dio, FlutterSecureStorage? storage})
       : dio = dio ?? Dio(),
@@ -44,20 +61,37 @@ class ApiClient {
     DioException error,
     ErrorInterceptorHandler handler,
   ) async {
-    if (error.response?.statusCode == 401) {
+    final path = error.requestOptions.path;
+    final isAuthPath = _authPaths.any(path.endsWith);
+
+    if (error.response?.statusCode == 401 && !isAuthPath) {
       final refreshed = await _refreshToken();
       if (refreshed) {
-        final retryResponse = await _retry(error.requestOptions);
-        return handler.resolve(retryResponse);
+        try {
+          final retryResponse = await _retry(error.requestOptions);
+          return handler.resolve(retryResponse);
+        } on DioException catch (retryError) {
+          return handler.next(retryError);
+        }
       }
     }
     handler.next(error);
   }
 
-  Future<bool> _refreshToken() async {
+  /// Bir nechta parallel chaqiruv bitta refreshni baham ko'radi.
+  Future<bool> _refreshToken() {
+    return _refreshInFlight ??= _performRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _performRefresh() async {
     try {
       final refreshToken = await _storage.read(key: _refreshKey);
-      if (refreshToken == null) return false;
+      if (refreshToken == null) {
+        onAuthFailure?.call();
+        return false;
+      }
 
       final response = await Dio().post(
         '$_baseUrl/auth/refresh',
@@ -70,6 +104,8 @@ class ApiClient {
       return true;
     } catch (_) {
       await clearTokens();
+      // Sessiya tiklanmadi — foydalanuvchini login ekraniga qaytarish kerak.
+      onAuthFailure?.call();
       return false;
     }
   }

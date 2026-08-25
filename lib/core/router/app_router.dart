@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -23,14 +24,38 @@ import '../../features/profile/presentation/driver_profile_screen.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-final appRouter = GoRouter(
+/// AuthBloc oqimini GoRouter tushunadigan Listenable'ga aylantiradi,
+/// shunda auth holati o'zgarganda redirect qayta baholanadi.
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+
+GoRouter createAppRouter(AuthBloc authBloc) => GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/login',
+  refreshListenable: GoRouterRefreshStream(authBloc.stream),
   redirect: (context, state) {
-    final authState = context.read<AuthBloc>().state;
-    final isLoggedIn = authState is AuthAuthenticated;
+    final authState = authBloc.state;
     final isLoginRoute = state.matchedLocation == '/login';
 
+    // Sessiya hali tekshirilmagan — login ekranida kutamiz, aks holda
+    // saqlangan token bo'lsa ham foydalanuvchi login'ga uloqtiriladi.
+    if (authState is AuthInitial || authState is AuthLoading) {
+      return isLoginRoute ? null : '/login';
+    }
+
+    final isLoggedIn = authState is AuthAuthenticated;
     if (!isLoggedIn && !isLoginRoute) return '/login';
     if (isLoggedIn && isLoginRoute) return '/home';
     return null;

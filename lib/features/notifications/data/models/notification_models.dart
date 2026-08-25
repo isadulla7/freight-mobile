@@ -3,7 +3,9 @@ class NotificationResponse {
   final String type;
   final String sourceType;
   final String? sourceId;
-  final Map<String, dynamic>? templateData;
+  /// Backend buni JSON matn sifatida qaytaradi (TEXT ustuni),
+  /// obyekt sifatida emas.
+  final String? templateData;
   final String? readAt;
   final String createdAt;
   final String? expiresAt;
@@ -25,7 +27,7 @@ class NotificationResponse {
       type: json['type'] as String,
       sourceType: json['sourceType'] as String,
       sourceId: json['sourceId'] as String?,
-      templateData: json['templateData'] as Map<String, dynamic>?,
+      templateData: json['templateData'] as String?,
       readAt: json['readAt'] as String?,
       createdAt: json['createdAt'] as String,
       expiresAt: json['expiresAt'] as String?,

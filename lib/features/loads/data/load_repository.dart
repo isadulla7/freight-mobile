@@ -58,10 +58,19 @@ class LoadRepository {
       limit: limit,
     );
     final loads = <LoadResponse>[];
+    Object? lastError;
     for (final id in ids) {
       try {
         loads.add(await getLoad(id));
-      } catch (_) {}
+      } catch (e) {
+        // Bitta yuk yuklanmasa ro'yxatni butunlay yo'qotmaymiz, lekin
+        // hammasi yiqilsa buni xatolik sifatida ko'rsatish kerak —
+        // aks holda foydalanuvchi "yuk yo'q" degan xabarni ko'radi.
+        lastError = e;
+      }
+    }
+    if (loads.isEmpty && lastError != null) {
+      throw Exception(lastError);
     }
     return loads;
   }
