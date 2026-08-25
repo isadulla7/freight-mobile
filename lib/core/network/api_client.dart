@@ -1,12 +1,10 @@
-import 'dart:io' show Platform;
-
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../config/app_config.dart';
+
 class ApiClient {
-  static final String _baseUrl = Platform.isAndroid
-      ? 'http://10.0.2.2:8080/api/v1'
-      : 'http://localhost:8080/api/v1';
+  static final String _baseUrl = AppConfig.baseUrl;
   static const _tokenKey = 'access_token';
   static const _refreshKey = 'refresh_token';
 
