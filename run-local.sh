@@ -5,16 +5,24 @@ set -euo pipefail
 #  Freight — USB telefonda ishga tushirish
 #
 #  Ishlatish:
-#     ./run-local.sh
+#     ./run-local.sh              — USB rejimi (adb reverse, tavsiya etiladi)
+#     ./run-local.sh wifi         — Wi-Fi rejimi (kompyuter IP orqali)
 #
 #  Skript bajaradi:
 #     1. Backend'ni ishga tushiradi (Docker yoki Gradle)
-#     2. adb reverse — telefon localhost'ini kompyuterga ulaydi
+#     2. Telefonni backendga ulaydi (adb reverse yoki Wi-Fi IP)
 #     3. flutter run
 #
-#  Backend boshqa papkada bo'lsa:
+#  Sozlamalar:
 #     BACKEND_DIR=/path/to/freight-backend ./run-local.sh
+#     BASE_URL=http://192.168.1.5:8080/api/v1 ./run-local.sh wifi
 # =============================================================
+
+MODE="usb"
+if [ "${1:-}" = "wifi" ] || [ "${1:-}" = "usb" ]; then
+    MODE="$1"
+    shift
+fi
 
 MOBILE_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="${BACKEND_DIR:-$(cd "$MOBILE_DIR/../freight-backend" 2>/dev/null && pwd || echo "")}"
@@ -89,7 +97,7 @@ else
 fi
 
 # ---------------------------------------------------------------
-# 2. adb reverse — telefonni backendga ulash
+# 2. Telefonni backendga ulash
 # ---------------------------------------------------------------
 if ! command -v adb > /dev/null 2>&1; then
     fail "adb topilmadi. Android SDK Platform Tools o'rnating."
@@ -107,21 +115,44 @@ if [ -z "$DEVICES" ]; then
     exit 1
 fi
 
-for dev in $DEVICES; do
-    adb -s "$dev" reverse tcp:${API_PORT} tcp:${API_PORT} > /dev/null
-    ok "adb reverse sozlandi: $dev"
-done
+if [ "$MODE" = "wifi" ]; then
+    # Wi-Fi: kompyuterning lokal IP manzili
+    LOCAL_IP=""
+    if command -v ip > /dev/null 2>&1; then
+        LOCAL_IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+    elif command -v ifconfig > /dev/null 2>&1; then
+        LOCAL_IP=$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+    fi
+
+    if [ -z "$LOCAL_IP" ]; then
+        fail "Lokal IP aniqlanmadi. Qo'lda bering:"
+        echo "   BASE_URL=http://192.168.1.5:${API_PORT}/api/v1 ./run-local.sh"
+        exit 1
+    fi
+
+    ok "Kompyuter IP: $LOCAL_IP"
+    echo "   Telefon shu Wi-Fi tarmoqda bo'lsin."
+    BASE_URL="${BASE_URL:-http://${LOCAL_IP}:${API_PORT}/api/v1}"
+else
+    # USB: adb reverse — tarmoqqa bog'liq emas
+    for dev in $DEVICES; do
+        adb -s "$dev" reverse tcp:${API_PORT} tcp:${API_PORT} > /dev/null
+        ok "adb reverse sozlandi: $dev"
+    done
+    BASE_URL="${BASE_URL:-http://localhost:${API_PORT}/api/v1}"
+fi
 
 # ---------------------------------------------------------------
 # 3. Flutter run
 # ---------------------------------------------------------------
 echo ""
 echo "=============================================="
-echo "  Backend : http://localhost:${API_PORT}/api/v1"
+echo "  Rejim   : $MODE"
+echo "  Backend : ${BASE_URL}"
 echo "  Swagger : http://localhost:${API_PORT}/swagger-ui/index.html"
 echo "  OTP kodi: 123456"
 echo "=============================================="
 echo ""
 
 cd "$MOBILE_DIR"
-exec flutter run "$@"
+exec flutter run --dart-define=BASE_URL="$BASE_URL" "$@"
