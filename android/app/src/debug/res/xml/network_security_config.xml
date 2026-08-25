@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FAQAT DEBUG BUILD uchun.
+    Lokal backendga HTTP orqali ulanishga ruxsat beradi:
+      • localhost      — USB (adb reverse) va iOS simulator
+      • 10.0.2.2       — Android emulator
+      • Wi-Fi IP       — kompyuterning lokal IP manzili (ipconfig / ifconfig)
+
+    Release build src/main/ dagi konfiguratsiyani ishlatadi (faqat HTTPS).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
