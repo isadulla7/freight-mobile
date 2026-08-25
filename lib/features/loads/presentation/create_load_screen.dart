@@ -164,29 +164,29 @@ class _CreateLoadScreenState extends State<CreateLoadScreen> {
               const SizedBox(height: 16),
               _sectionTitle('Narx'),
               _buildCard([
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Belgilangan', style: TextStyle(fontSize: 14)),
-                        value: 'FIXED',
-                        groupValue: _pricingMode,
-                        onChanged: (v) => setState(() => _pricingMode = v!),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
+                RadioGroup<String>(
+                  groupValue: _pricingMode,
+                  onChanged: (v) => setState(() => _pricingMode = v!),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: Text('Belgilangan', style: TextStyle(fontSize: 14)),
+                          value: 'FIXED',
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Taklif', style: TextStyle(fontSize: 14)),
-                        value: 'OFFERS',
-                        groupValue: _pricingMode,
-                        onChanged: (v) => setState(() => _pricingMode = v!),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: Text('Taklif', style: TextStyle(fontSize: 14)),
+                          value: 'OFFERS',
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 if (_pricingMode == 'FIXED')
                   _field(

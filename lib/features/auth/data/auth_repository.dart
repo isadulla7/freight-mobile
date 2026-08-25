@@ -31,7 +31,7 @@ class AuthRepository {
         data: {
           'phoneNumber': phoneNumber,
           'otp': otp,
-          if (deviceLabel != null) 'deviceLabel': deviceLabel,
+          'deviceLabel': ?deviceLabel,
         },
       );
       final tokens = SessionTokens.fromJson(response.data as Map<String, dynamic>);

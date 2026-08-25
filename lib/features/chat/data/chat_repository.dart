@@ -33,7 +33,7 @@ class ChatRepository {
     final response = await _api.dio.get(
       '/conversations/$conversationId/messages',
       queryParameters: {
-        if (afterSequence != null) 'afterSequence': afterSequence,
+        'afterSequence': ?afterSequence,
       },
     );
     final data = response.data as Map<String, dynamic>;

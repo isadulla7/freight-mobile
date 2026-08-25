@@ -151,7 +151,7 @@ class _CreateOfferSheetState extends State<CreateOfferSheet> {
           else ...[
             if (_vehicles.length > 1)
               DropdownButtonFormField<VehicleResponse>(
-                value: _selectedVehicle,
+                initialValue: _selectedVehicle,
                 decoration: const InputDecoration(
                   labelText: 'Transport',
                   prefixIcon: Icon(Icons.local_shipping_outlined),
