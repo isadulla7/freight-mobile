@@ -33,10 +33,10 @@ class VehicleRepository {
     int? manufactureYear,
   }) async {
     await _api.dio.patch('/vehicles/$vehicleId', data: {
-      if (plateNumber != null) 'plateNumber': plateNumber,
-      if (capacityKg != null) 'capacityKg': capacityKg,
-      if (volumeM3 != null) 'volumeM3': volumeM3,
-      if (manufactureYear != null) 'manufactureYear': manufactureYear,
+      'plateNumber': ?plateNumber,
+      'capacityKg': ?capacityKg,
+      'volumeM3': ?volumeM3,
+      'manufactureYear': ?manufactureYear,
     });
   }
 

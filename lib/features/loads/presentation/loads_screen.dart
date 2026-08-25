@@ -131,7 +131,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
         child: ListView.separated(
           padding: EdgeInsets.zero,
           itemCount: loads.length,
-          separatorBuilder: (_, __) =>
+          separatorBuilder: (_, _) =>
               const Divider(indent: 16, endIndent: 16),
           itemBuilder: (context, index) {
             final load = loads[index];

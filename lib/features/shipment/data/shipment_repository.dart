@@ -27,8 +27,8 @@ class ShipmentRepository {
   }) async {
     await _api.dio.post('/shipments/$shipmentId/status', data: {
       'status': status,
-      if (reasonCode != null) 'reasonCode': reasonCode,
-      if (reasonContext != null) 'reasonContext': reasonContext,
+      'reasonCode': ?reasonCode,
+      'reasonContext': ?reasonContext,
     });
   }
 

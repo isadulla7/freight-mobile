@@ -108,7 +108,7 @@ class _CreateVehicleScreenState extends State<CreateVehicleScreen> {
                 children: [
                   _buildCard([
                     DropdownButtonFormField<String>(
-                      value: _selectedVehicleTypeId,
+                      initialValue: _selectedVehicleTypeId,
                       decoration: const InputDecoration(
                         labelText: 'Transport turi',
                         prefixIcon: Icon(Icons.local_shipping_outlined),
@@ -124,7 +124,7 @@ class _CreateVehicleScreenState extends State<CreateVehicleScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedBodyTypeId,
+                      initialValue: _selectedBodyTypeId,
                       decoration: const InputDecoration(
                         labelText: 'Kuzov turi (ixtiyoriy)',
                         prefixIcon: Icon(Icons.view_in_ar_outlined),
