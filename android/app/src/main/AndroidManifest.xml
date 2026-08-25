@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Ilova backend API bilan ishlaydi — release buildda ham kerak. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="freight_mobile"
         android:name="${applicationName}"

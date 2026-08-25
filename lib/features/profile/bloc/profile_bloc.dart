@@ -14,6 +14,11 @@ class ProfileFetchRequested extends ProfileEvent {
   const ProfileFetchRequested();
 }
 
+/// Logout'da chaqiriladi.
+class ProfileReset extends ProfileEvent {
+  const ProfileReset();
+}
+
 // States
 sealed class ProfileState extends Equatable {
   const ProfileState();
@@ -49,6 +54,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   ProfileBloc(this._repository) : super(const ProfileInitial()) {
     on<ProfileFetchRequested>(_onFetch);
+    on<ProfileReset>((_, emit) => emit(const ProfileInitial()));
   }
 
   Future<void> _onFetch(

@@ -30,11 +30,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     });
     try {
       final response = await sl.vehicleRepository.getMyVehicles();
+      if (!mounted) return;
       setState(() {
         _vehicles = response;
         _isLoading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Transportlarni yuklashda xatolik';
         _isLoading = false;
@@ -158,14 +160,16 @@ class _VehicleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Backend VehicleStatus: ACTIVE / INACTIVE / ARCHIVED
     final badgeType = switch (vehicle.status) {
       'ACTIVE' => BadgeType.published,
-      'DEACTIVATED' => BadgeType.cancelled,
+      'INACTIVE' || 'ARCHIVED' => BadgeType.cancelled,
       _ => BadgeType.draft,
     };
     final statusLabel = switch (vehicle.status) {
       'ACTIVE' => 'Faol',
-      'DEACTIVATED' => 'O\'chirilgan',
+      'INACTIVE' => 'Faol emas',
+      'ARCHIVED' => 'Arxivlangan',
       _ => vehicle.status,
     };
 

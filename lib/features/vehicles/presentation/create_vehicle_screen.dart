@@ -25,6 +25,7 @@ class _CreateVehicleScreenState extends State<CreateVehicleScreen> {
   String? _selectedBodyTypeId;
   bool _isLoading = false;
   bool _isSubmitting = false;
+  String? _referenceError;
 
   @override
   void initState() {
@@ -33,19 +34,29 @@ class _CreateVehicleScreenState extends State<CreateVehicleScreen> {
   }
 
   Future<void> _loadReferenceData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _referenceError = null;
+    });
     try {
       final results = await Future.wait([
         sl.vehicleRepository.getVehicleTypes(),
         sl.vehicleRepository.getBodyTypes(),
       ]);
+      if (!mounted) return;
       setState(() {
         _vehicleTypes = results[0];
         _bodyTypes = results[1];
         _isLoading = false;
       });
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      // Ma'lumotnoma yuklanmasa dropdown'lar bo'sh qoladi va formani
+      // yuborib bo'lmaydi — sababini ko'rsatish shart.
+      setState(() {
+        _referenceError = 'Ma\'lumotnoma yuklanmadi';
+        _isLoading = false;
+      });
     }
   }
 
@@ -101,6 +112,26 @@ class _CreateVehicleScreenState extends State<CreateVehicleScreen> {
       appBar: AppBar(title: const Text('Transport qo\'shish')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _referenceError != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline,
+                      size: 48, color: AppColors.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    _referenceError!,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _loadReferenceData,
+                    child: const Text('Qayta urinish'),
+                  ),
+                ],
+              ),
+            )
           : Form(
               key: _formKey,
               child: ListView(

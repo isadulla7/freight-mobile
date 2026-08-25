@@ -29,11 +29,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final notifications =
           await sl.notificationRepository.getNotifications();
+      if (!mounted) return;
       setState(() {
         _notifications = notifications;
         _isLoading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Bildirishnomalarni yuklashda xatolik';
         _isLoading = false;

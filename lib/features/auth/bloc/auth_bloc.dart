@@ -145,7 +145,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (e.toString().contains('RATE_LIMIT')) {
       return 'Juda ko\'p urinish. Biroz kuting';
     }
-    if (e.toString().contains('INVALID_OTP')) {
+    // Backend noto'g'ri kod uchun INVALID_CREDENTIALS qaytaradi.
+    if (e.toString().contains('INVALID_CREDENTIALS') ||
+        e.toString().contains('INVALID_OTP')) {
       return 'Noto\'g\'ri kod kiritildi';
     }
     return 'Xatolik yuz berdi. Qayta urinib ko\'ring';

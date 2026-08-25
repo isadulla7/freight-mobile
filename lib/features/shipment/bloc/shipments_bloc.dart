@@ -25,6 +25,11 @@ class ShipmentStatusUpdateRequested extends ShipmentsEvent {
   List<Object?> get props => [shipmentId, status];
 }
 
+/// Logout'da chaqiriladi.
+class ShipmentsReset extends ShipmentsEvent {
+  const ShipmentsReset();
+}
+
 // States
 sealed class ShipmentsState extends Equatable {
   const ShipmentsState();
@@ -42,9 +47,14 @@ class ShipmentsLoading extends ShipmentsState {
 
 class ShipmentsLoaded extends ShipmentsState {
   final List<ShipmentResponse> shipments;
-  const ShipmentsLoaded(this.shipments);
+
+  /// Har yuklashda ortadi — ro'yxat uzunligi o'zgarmagan holatda ham
+  /// (status yangilanganda) UI qayta chizilishini kafolatlaydi.
+  final int revision;
+
+  const ShipmentsLoaded(this.shipments, {this.revision = 0});
   @override
-  List<Object?> get props => [shipments.length];
+  List<Object?> get props => [shipments.length, revision];
 }
 
 class ShipmentsError extends ShipmentsState {
@@ -57,10 +67,12 @@ class ShipmentsError extends ShipmentsState {
 // BLoC
 class ShipmentsBloc extends Bloc<ShipmentsEvent, ShipmentsState> {
   final ShipmentRepository _repository;
+  int _revision = 0;
 
   ShipmentsBloc(this._repository) : super(const ShipmentsInitial()) {
     on<ShipmentsFetchRequested>(_onFetch);
     on<ShipmentStatusUpdateRequested>(_onStatusUpdate);
+    on<ShipmentsReset>(_onReset);
   }
 
   Future<void> _onFetch(
@@ -70,7 +82,7 @@ class ShipmentsBloc extends Bloc<ShipmentsEvent, ShipmentsState> {
     emit(const ShipmentsLoading());
     try {
       final shipments = await _repository.getMyShipments();
-      emit(ShipmentsLoaded(shipments));
+      emit(ShipmentsLoaded(shipments, revision: ++_revision));
     } catch (e) {
       emit(const ShipmentsError('Yetkazishlar yuklanmadi'));
     }
@@ -80,11 +92,23 @@ class ShipmentsBloc extends Bloc<ShipmentsEvent, ShipmentsState> {
     ShipmentStatusUpdateRequested event,
     Emitter<ShipmentsState> emit,
   ) async {
+    final previous = state;
     try {
       await _repository.updateStatus(event.shipmentId, status: event.status);
-      add(const ShipmentsFetchRequested());
+      final shipments = await _repository.getMyShipments();
+      emit(ShipmentsLoaded(shipments, revision: ++_revision));
     } catch (e) {
       emit(const ShipmentsError('Holatni yangilashda xatolik'));
+      // Xatolik butun ro'yxatni yo'q qilmasligi kerak — oldingi
+      // yuklangan ma'lumotni qaytaramiz.
+      if (previous is ShipmentsLoaded) {
+        emit(ShipmentsLoaded(previous.shipments, revision: ++_revision));
+      }
     }
+  }
+
+  void _onReset(ShipmentsReset event, Emitter<ShipmentsState> emit) {
+    _revision = 0;
+    emit(const ShipmentsInitial());
   }
 }

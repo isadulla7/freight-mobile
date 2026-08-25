@@ -29,11 +29,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     });
     try {
       final conversations = await sl.chatRepository.getConversations();
+      if (!mounted) return;
       setState(() {
         _conversations = conversations;
         _isLoading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Suhbatlarni yuklashda xatolik';
         _isLoading = false;
